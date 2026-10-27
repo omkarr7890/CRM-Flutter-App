@@ -1,4 +1,5 @@
 
+import 'package:field_visit_app/splashScreen/Splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'Login Page/login.dart';
 void main() {
@@ -12,6 +13,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+
       title: 'MyApp',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -19,7 +21,7 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const LoginPage(),
+      home:SplashScreen(),
     );
   }
 }
