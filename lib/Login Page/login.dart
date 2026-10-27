@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
+import 'package:shared_preferences/shared_preferences.dart';
 import '../Profile/profile_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -116,17 +116,21 @@ class _LoginPageState extends State<LoginPage>
         if (success) {
           final Map<String, dynamic> data =
           decoded['data'] as Map<String, dynamic>;
-
           final String empName = (data['emp_name'] ?? '').toString();
 
-          if (empName.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Employee name was not returned.'),
-              ),
-            );
-            return;
-          }
+          // Save login status
+          final prefs = await SharedPreferences.getInstance();
+
+          await prefs.setBool('isLoggedIn', true);
+          await prefs.setString('empName', empName);
+
+           // Navigate to Profile Page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProfilePage(empName: empName),
+            ),
+          );
 
           Navigator.pushReplacement(
             context,
@@ -471,11 +475,13 @@ class _LoginPageState extends State<LoginPage>
                                     CrossAxisAlignment.stretch,
                                     children: [
                                       const Text(
-                                        'Sign In',
+                                        'Login',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           fontSize: 25,
                                           fontWeight: FontWeight.bold,
+
+
                                           color: Color(0xFF163B80),
                                         ),
                                       ),
