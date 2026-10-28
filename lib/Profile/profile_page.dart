@@ -1,6 +1,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+<<<<<<< Updated upstream
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +13,14 @@ import 'package:geocoding/geocoding.dart';
 
 import 'package:field_visit_app/AppDrawer/app_drawer.dart';
 
+=======
+import 'dart:ui';
+
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:field_visit_app/AppDrawer/app_drawer.dart';
+>>>>>>> Stashed changes
 class ProfilePage extends StatefulWidget {
   final String empName;
 
@@ -56,9 +65,141 @@ class _ProfilePageState extends State<ProfilePage> {
   int? _presentCount;
   int? _absentCount;
 
+  Future<void> _fetchAttendanceSummary() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final personId = prefs.getInt('emp_id');
+      final username = prefs.getString('user_name');
+      final password = prefs.getString('user_pass');
+
+      debugPrint('Attendance emp_id: $personId');
+      debugPrint('Attendance user_name: $username');
+      debugPrint(
+        'Attendance password exists: ${password != null && password.isNotEmpty}',
+      );
+
+      if (personId == null || username == null || password == null) {
+        debugPrint('ERROR: Login details are missing in SharedPreferences.');
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse(
+          'https://salasarcrm.aonesalasar.com/api/mobile/emp-details',
+        ),
+        headers: {
+          'Accept': 'application/json',
+        },
+        body: {
+          'person_id': personId.toString(),
+          'Username': username,
+          'Password': password,
+        },
+      );
+
+      debugPrint('Attendance status: ${response.statusCode}');
+      debugPrint('Attendance response: ${response.body}');
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint('ERROR: Attendance API request failed.');
+        return;
+      }
+
+      final dynamic decoded = jsonDecode(response.body);
+
+      if (decoded is! Map) {
+        debugPrint('ERROR: API response is not a JSON object.');
+        return;
+      }
+
+      final Map<String, dynamic> root =
+      Map<String, dynamic>.from(decoded);
+
+      // Inspect the actual response structure.
+      debugPrint('Root keys: ${root.keys.toList()}');
+
+      dynamic data = root['data'] ?? root;
+
+      if (data is List) {
+        if (data.isEmpty) {
+          debugPrint('ERROR: API returned an empty data list.');
+          return;
+        }
+        data = data.first;
+      }
+
+      if (data is! Map) {
+        debugPrint('ERROR: Employee data is not an object.');
+        return;
+      }
+
+      final Map<String, dynamic> employeeData =
+      Map<String, dynamic>.from(data);
+
+      debugPrint('Employee data keys: ${employeeData.keys.toList()}');
+
+      // Try common locations for the attendance summary.
+      dynamic summary =
+          employeeData['attendance_summary'] ??
+              employeeData['attendanceSummary'] ??
+              root['attendance_summary'] ??
+              root['attendanceSummary'];
+
+      // Some APIs return counts directly inside data.
+      summary ??= employeeData;
+
+      final int? present = _readCount(
+        summary,
+        ['present_count', 'presentCount', 'present'],
+      );
+
+      final int? absent = _readCount(
+        summary,
+        ['absent_count', 'absentCount', 'absent'],
+      );
+
+      if (present == null || absent == null) {
+        debugPrint('ERROR: Present/absent fields were not found.');
+        debugPrint('Summary data: $summary');
+        return;
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _presentCount = present;
+        _absentCount = absent;
+      });
+
+      debugPrint('Present count: $present');
+      debugPrint('Absent count: $absent');
+    } catch (e, stackTrace) {
+      debugPrint('Attendance API error: $e');
+      debugPrint('$stackTrace');
+    }
+  }
+
+  int? _readCount(dynamic data, List<String> keys) {
+    if (data is! Map) return null;
+
+    for (final key in keys) {
+      final value = data[key];
+
+      if (value != null) {
+        if (value is num) return value.toInt();
+
+        final parsed = int.tryParse(value.toString());
+        if (parsed != null) return parsed;
+      }
+    }
+
+    return null;
+  }
   @override
   void initState() {
     super.initState();
+    _fetchAttendanceSummary();
 
     _clockTimer = Timer.periodic(
       const Duration(seconds: 1),
@@ -524,12 +665,24 @@ class _ProfilePageState extends State<ProfilePage> {
             child: RefreshIndicator(
               color: _blue,
               onRefresh: () async {
+<<<<<<< Updated upstream
                 if (mounted) {
                   setState(() => _now = DateTime.now());
                 }
               },
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
+=======
+                await _fetchAttendanceSummary();
+
+                if (mounted) {
+                  setState(() => _now = DateTime.now());
+                }
+              },              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+>>>>>>> Stashed changes
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(

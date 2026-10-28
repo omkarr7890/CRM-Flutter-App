@@ -1,8 +1,12 @@
 import 'dart:ui';
-
+import '../Leave_Application/LeaveApplication.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Employee Tracker/employee_tracker_page.dart';
+import '../Login Page/login.dart';
+import '../main.dart' show navigatorKey;
+
+
 class CrmColors {
   static const Color primary = Color(0xFF0755D9);
   static const Color secondary = Color(0xFF43C8F5);
@@ -147,6 +151,27 @@ class _AppDrawerState extends State<AppDrawer> {
                             );
                           },
                         ),
+
+                        const SizedBox(height: 10),
+
+                        _buildDrawerItem(
+                          title: 'Leave Application',
+                          subtitle: 'Apply for and manage your leave',
+                          icon: Icons.event_note_rounded,
+                          selected: false,
+                          onTap: () {
+                            Navigator.pop(context);
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LeaveApplicationPage(),
+                              ),
+                            );
+                          },
+                        ),
+
+
                       ],
                     ),
                   ),
@@ -156,22 +181,279 @@ class _AppDrawerState extends State<AppDrawer> {
                     indent: 22,
                     endIndent: 22,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
-                    child: _buildDrawerItem(
-                      title: 'Log Out',
-                      subtitle: 'Sign out of your account',
-                      icon: Icons.logout_rounded,
-                      selected: false,
-                      isLogout: true,
-                      onTap: () {
-                        Navigator.pop(context);
-                        widget.onLogoutTap();
-                      },
-                    ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                  child: _buildDrawerItem(
+                    title: 'Log Out',
+                    subtitle: 'Sign out of your account',
+                    icon: Icons.logout_rounded,
+                    selected: false,
+                    isLogout: true,
+                    onTap: () {
+                      Navigator.pop(context); // Close drawer first
+
+
+                      showGeneralDialog(
+                        context: context,
+                        barrierDismissible: true,
+                        barrierLabel: 'Logout confirmation',
+                        barrierColor: const Color(0xFF07152E).withOpacity(0.55),
+                        transitionDuration: const Duration(milliseconds: 400),
+                        pageBuilder: (dialogContext, animation, secondaryAnimation) {
+                          return const SizedBox.shrink();
+                        },
+                        transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+                          final curvedAnimation = CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOutBack,
+                            reverseCurve: Curves.easeInCubic,
+                          );
+
+                          return FadeTransition(
+                            opacity: animation,
+                            child: ScaleTransition(
+                              scale: Tween<double>(
+                                begin: 0.75,
+                                end: 1.0,
+                              ).animate(curvedAnimation),
+                              child: Center(
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: Container(
+                                    width: MediaQuery.of(dialogContext).size.width * 0.86,
+                                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(30),
+                                      border: Border.all(
+                                        color: const Color(0xFFDCE9FF),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF0755D9).withOpacity(0.18),
+                                          blurRadius: 35,
+                                          offset: const Offset(0, 15),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // Animated blue icon
+                                        TweenAnimationBuilder<double>(
+                                          tween: Tween(begin: 0.0, end: 1.0),
+                                          duration: const Duration(milliseconds: 650),
+                                          curve: Curves.elasticOut,
+                                          builder: (context, value, child) {
+                                            return Transform.scale(
+                                              scale: value,
+                                              child: child,
+                                            );
+                                          },
+                                          child: Container(
+                                            width: 94,
+                                            height: 94,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              gradient: const LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: [
+                                                  Color(0xFF43C8F5),
+                                                  Color(0xFF0755D9),
+                                                ],
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(0xFF0755D9)
+                                                      .withOpacity(0.25),
+                                                  blurRadius: 24,
+                                                  offset: const Offset(0, 9),
+                                                ),
+                                              ],
+                                            ),
+                                            child: const Icon(
+                                              Icons.power_settings_new_rounded,
+                                              color: Colors.white,
+                                              size: 46,
+                                            ),
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 25),
+
+                                        const Text(
+                                          'Leaving So Soon?',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: -0.6,
+                                            color: Color(0xFF10213F),
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 12),
+
+                                        const Text(
+                                          'Are you sure you want to sign out of your CRM workspace?',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            height: 1.6,
+                                            color: Color(0xFF71809A),
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 30),
+
+                                        // Confirm logout
+                                        SizedBox(
+                                          width: double.infinity,
+                                          height: 52,
+                                          child: DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              gradient: const LinearGradient(
+                                                colors: [
+                                                  Color(0xFF0755D9),
+                                                  Color(0xFF2787F5),
+                                                ],
+                                              ),
+                                              borderRadius: BorderRadius.circular(16),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(0xFF0755D9)
+                                                      .withOpacity(0.22),
+                                                  blurRadius: 14,
+                                                  offset: const Offset(0, 6),
+                                                ),
+                                              ],
+                                            ),
+                                            child: ElevatedButton(
+                                              // Open Login page through parent callback
+
+
+                                              onPressed: () async {
+                                                debugPrint('LOGOUT: Button clicked');
+
+                                                final prefs = await SharedPreferences.getInstance();
+
+                                                await prefs.setBool('isLoggedIn', false);
+                                                await prefs.remove('empName');
+                                                await prefs.remove('emp_name');
+                                                await prefs.remove('email_office');
+                                                await prefs.remove('designation');
+                                                await prefs.remove('emp_id');
+                                                await prefs.remove('user_type');
+
+                                                debugPrint('LOGOUT: Session cleared');
+
+                                                final navigator = navigatorKey.currentState;
+
+                                                if (navigator == null) {
+                                                  debugPrint('LOGOUT ERROR: Root navigator is unavailable');
+                                                  return;
+                                                }
+
+                                                navigator.pushAndRemoveUntil(
+                                                  MaterialPageRoute<void>(
+                                                    builder: (_) => const LoginPage(),
+                                                  ),
+                                                      (route) => false,
+                                                );
+
+                                                debugPrint('LOGOUT: LoginPage opened');
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.transparent,
+                                                shadowColor: Colors.transparent,
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(16),
+                                                ),
+                                              ),
+                                              child: const Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(Icons.logout_rounded, size: 19),
+                                                  SizedBox(width: 9),
+                                                  Text(
+                                                    'Yes, Log Me Out',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.w800,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 12),
+
+                                        // Cancel
+                                        SizedBox(
+                                          width: double.infinity,
+                                          height: 50,
+                                          child: OutlinedButton(
+                                            onPressed: () => Navigator.pop(dialogContext),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: const Color(0xFF0755D9),
+                                              backgroundColor: const Color(0xFFF3F7FF),
+                                              side: const BorderSide(
+                                                color: Color(0xFFDCE8FF),
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'Stay Logged In',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 15),
+
+                                        const Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.lock_outline_rounded,
+                                              size: 14,
+                                              color: Color(0xFF91A0B8),
+                                            ),
+                                            SizedBox(width: 6),
+                                            Text(
+                                              'Your account security matters',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Color(0xFF91A0B8),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+
+                    },
                   ),
-                ],
-              ),
+                ),            ]
+            ),
             ),
           ),
         ),

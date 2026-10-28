@@ -113,6 +113,7 @@ class _LoginPageState extends State<LoginPage>
 
         final bool success = decoded['status'] == 'success';
 
+<<<<<<< Updated upstream
         if (success) {
           final Map<String, dynamic> data =
           Map<String, dynamic>.from(decoded['data']);
@@ -138,6 +139,29 @@ class _LoginPageState extends State<LoginPage>
           final prefs = await SharedPreferences.getInstance();
 
           // Save the employee information
+=======
+
+        if (success) {
+          final dynamic rawData = decoded['data'];
+
+          if (rawData is! Map<String, dynamic>) {
+            throw const FormatException('Invalid employee data.');
+          }
+
+          final String empName = (rawData['emp_name'] ?? '').toString().trim();
+
+          if (empName.isEmpty) {
+            throw const FormatException(
+              'Employee name is missing from the login response.',
+            );
+          }
+
+
+          final prefs = await SharedPreferences.getInstance();
+
+// Save login session
+          await prefs.setBool('isLoggedIn', true);
+>>>>>>> Stashed changes
           await prefs.setString('empName', empName);
           await prefs.setString('emp_id', empId);
           await prefs.setString('username', username);
@@ -157,6 +181,7 @@ class _LoginPageState extends State<LoginPage>
 
           if (!mounted) return;
 
+<<<<<<< Updated upstream
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -164,6 +189,52 @@ class _LoginPageState extends State<LoginPage>
             ),
           );
         }else {
+=======
+// Save the logged-in employee's details dynamically
+          await prefs.setInt(
+            'emp_id',
+            int.parse(rawData['emp_id'].toString()),
+          );
+
+          await prefs.setString(
+            'user_name',
+            rawData['user_name'].toString(),
+          );
+
+          await prefs.setString(
+            'emp_name',
+            empName,
+          );
+
+// Save the password for the current attendance API request.
+// Production apps should use secure authentication instead.
+          await prefs.setString(
+            'user_pass',
+            _passwordController.text,
+          );
+
+          debugPrint('LOGIN PREFS SAVED:');
+          debugPrint('emp_id: ${prefs.getInt('emp_id')}');
+          debugPrint('user_name: ${prefs.getString('user_name')}');
+          debugPrint(
+            'user_pass exists: '
+                '${(prefs.getString('user_pass') ?? '').isNotEmpty}',
+          );
+
+
+
+          if (!mounted) return;
+
+          // Navigate to Profile only once
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProfilePage(empName: empName),
+            ),
+                (route) => false,
+          );
+        } else {
+>>>>>>> Stashed changes
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -172,6 +243,7 @@ class _LoginPageState extends State<LoginPage>
             ),
           );
         }
+
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
