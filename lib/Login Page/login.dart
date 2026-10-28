@@ -115,30 +115,55 @@ class _LoginPageState extends State<LoginPage>
 
         if (success) {
           final Map<String, dynamic> data =
-          decoded['data'] as Map<String, dynamic>;
-          final String empName = (data['emp_name'] ?? '').toString();
+          Map<String, dynamic>.from(decoded['data']);
 
-          // Save login status
+          debugPrint('Login response fields: ${data.keys.toList()}');
+
+          final String empName =
+          (data['emp_name'] ?? '').toString();
+
+          final String empId =
+          (data['emp_id'] ?? '').toString().trim();
+
+          final String username = _usernameController.text.trim();
+          final String password = _passwordController.text;
+
+          if (empId.isEmpty) {
+            throw Exception(
+              'Employee ID missing from login response. '
+                  'Available fields: ${data.keys.join(', ')}',
+            );
+          }
+
           final prefs = await SharedPreferences.getInstance();
 
-          await prefs.setBool('isLoggedIn', true);
+          // Save the employee information
           await prefs.setString('empName', empName);
+          await prefs.setString('emp_id', empId);
+          await prefs.setString('username', username);
 
-           // Navigate to Profile Page
+          // Existing Punch API requires Password.
+          // For production, store credentials securely instead.
+          await prefs.setString('password', password);
+
+          // Mark login successful only after the required data is saved.
+          await prefs.setBool('isLoggedIn', true);
+
+          debugPrint('========== LOGIN STORAGE ==========');
+          debugPrint('Username saved: ${prefs.containsKey('username')}');
+          debugPrint('Password saved: ${prefs.containsKey('password')}');
+          debugPrint('Employee ID saved: ${prefs.containsKey('emp_id')}');
+          debugPrint('===================================');
+
+          if (!mounted) return;
+
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => ProfilePage(empName: empName),
             ),
           );
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>ProfilePage(empName: empName),
-            ),
-          );
-        } else {
+        }else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(

@@ -37,13 +37,15 @@ dependencies:
   cupertino_icons: ^1.0.2
   http: ^1.2.0
   shared_preferences: ^2.2.3
+  location: 5.0.3
+  geocoding: 3.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.3.11
+  flutter_native_splash: 2.3.10
 
 flutter_native_splash:
   color: "#FFFFFF"

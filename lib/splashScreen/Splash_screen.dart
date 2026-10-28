@@ -85,23 +85,64 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> checkLoginStatus() async {
     if (_isNavigating) return;
+
     _isNavigating = true;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final SharedPreferences prefs =
+      await SharedPreferences.getInstance();
 
-      final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-      final empName = prefs.getString('empName') ?? '';
+      // STEP 1: Read saved login details
+      final bool isLoggedIn =
+          prefs.getBool('isLoggedIn') ?? false;
+
+      final String empName =
+          prefs.getString('empName') ?? '';
+
+      final String username =
+          prefs.getString('username') ?? '';
+
+      final String password =
+          prefs.getString('password') ?? '';
+
+      final String empId =
+      (prefs.get('emp_id') ?? '').toString();
+
+      // STEP 2: Validate complete login session
+      final bool hasCompleteSession =
+          isLoggedIn &&
+              empName.trim().isNotEmpty &&
+              username.trim().isNotEmpty &&
+              password.isNotEmpty &&
+              empId.trim().isNotEmpty;
+
+      // STEP 3: Debug saved session details
+      debugPrint('========== SPLASH LOGIN CHECK ==========');
+      debugPrint('Logged In: $isLoggedIn');
+      debugPrint('Employee Name: ${empName.isNotEmpty}');
+      debugPrint('Username: ${username.isNotEmpty}');
+      debugPrint('Password: ${password.isNotEmpty}');
+      debugPrint('Employee ID: ${empId.isNotEmpty}');
+      debugPrint('Complete Session: $hasCompleteSession');
+      debugPrint('========================================');
 
       if (!mounted) return;
 
-      if (isLoggedIn && empName.isNotEmpty) {
+      // STEP 4: Navigate based on session
+      if (hasCompleteSession) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => ProfilePage(empName: empName),
+            builder: (_) => ProfilePage(
+              empName: empName,
+            ),
           ),
         );
       } else {
+        // Incomplete session - require fresh login
+        await prefs.setBool('isLoggedIn', false);
+
+        if (!mounted) return;
+
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => const LoginPage(),
@@ -109,9 +150,12 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     } catch (e) {
+      debugPrint(
+        'Splash login validation error: ${e.runtimeType}',
+      );
+
       if (!mounted) return;
 
-      // If preferences cannot be read, show the login page.
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => const LoginPage(),
