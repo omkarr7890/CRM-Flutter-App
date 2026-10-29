@@ -1,12 +1,12 @@
+
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math' as math;
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:location/location.dart' as loc;
-import 'package:geocoding/geocoding.dart';
 import 'package:field_visit_app/AppDrawer/app_drawer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../widgets/crm_app_bar.dart';
 
 class ProfilePage extends StatefulWidget {
   final String empName;
@@ -30,181 +30,55 @@ class _ProfilePageState extends State<ProfilePage> {
   static const Color _green = Color(0xFF16A879);
   static const Color _orange = Color(0xFFFFA34D);
 
-  // Replace with the actual Punch In/Out API endpoint.
-  static const String _punchApiUrl =
-      'https://salasarcrm.aonesalasar.com/api/mobile/set-user-attend';
-
   Timer? _clockTimer;
   DateTime _now = DateTime.now();
 
+  // Employee name loaded from SharedPreferences.
+  String _loggedInEmpName = '';
+
   bool _isPunchInLoading = false;
   bool _isPunchOutLoading = false;
-  bool _hasPunchedIn = false;
 
-  String? _punchInTime;
-  String? _punchOutTime;
-
-  String _locationAddress = 'Location not verified';
-  double? _latitude;
-  double? _longitude;
-
-  // These remain empty until the attendance-summary
-  // API is integrated.
+  // Connect these to the attendance-summary API.
   int? _presentCount;
   int? _absentCount;
-
-  Future<void> _fetchAttendanceSummary() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      final int? personId =
-          prefs.getInt('emp_id_numeric') ??
-              int.tryParse(prefs.getString('emp_id') ?? '');
-
-      final String? username =
-          prefs.getString('user_name') ?? prefs.getString('username');
-
-      final String? password =
-          prefs.getString('user_pass') ?? prefs.getString('password');
-
-      debugPrint('Attendance employee ID: $personId');
-      debugPrint('Attendance username available: ${username?.isNotEmpty == true}');
-      debugPrint('Attendance password available: ${password?.isNotEmpty == true}');
-
-      if (personId == null ||
-          username == null ||
-          username.isEmpty ||
-          password == null ||
-          password.isEmpty) {
-        debugPrint('ERROR: Required login details are missing.');
-        return;
-      }
-
-
-      final response = await http.post(
-        Uri.parse(
-          'https://salasarcrm.aonesalasar.com/api/mobile/emp-details',
-        ),
-        headers: {
-          'Accept': 'application/json',
-        },
-        body: {
-          'person_id': personId.toString(),
-          'Username': username,
-          'Password': password,
-        },
-      );
-      debugPrint('Punch API Status: ${response.statusCode}');
-      debugPrint('Punch API Response: ${response.body}');
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        debugPrint('ERROR: Attendance API request failed.');
-        return;
-      }
-
-      final dynamic decoded = jsonDecode(response.body);
-
-      if (decoded is! Map) {
-        debugPrint('ERROR: API response is not a JSON object.');
-        return;
-      }
-
-      final Map<String, dynamic> root = Map<String, dynamic>.from(decoded);
-
-      // Inspect the actual response structure.
-      debugPrint('Root keys: ${root.keys.toList()}');
-
-      dynamic data = root['data'] ?? root;
-
-      if (data is List) {
-        if (data.isEmpty) {
-          debugPrint('ERROR: API returned an empty data list.');
-          return;
-        }
-        data = data.first;
-      }
-
-      if (data is! Map) {
-        debugPrint('ERROR: Employee data is not an object.');
-        return;
-      }
-
-      final Map<String, dynamic> employeeData = Map<String, dynamic>.from(data);
-
-      debugPrint('Employee data keys: ${employeeData.keys.toList()}');
-
-      // Try common locations for the attendance summary.
-      dynamic summary = employeeData['attendance_summary'] ??
-          employeeData['attendanceSummary'] ??
-          root['attendance_summary'] ??
-          root['attendanceSummary'];
-
-      // Some APIs return counts directly inside data.
-      summary ??= employeeData;
-
-      final int? present = _readCount(
-        summary,
-        ['present_count', 'presentCount', 'present'],
-      );
-
-      final int? absent = _readCount(
-        summary,
-        ['absent_count', 'absentCount', 'absent'],
-      );
-
-      if (present == null || absent == null) {
-        debugPrint('ERROR: Present/absent fields were not found.');
-        debugPrint('Summary data: $summary');
-        return;
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        _presentCount = present;
-        _absentCount = absent;
-      });
-
-      debugPrint('Present count: $present');
-      debugPrint('Absent count: $absent');
-    } catch (e, stackTrace) {
-      debugPrint('Attendance API error: $e');
-      debugPrint('$stackTrace');
-    }
-  }
-
-  int? _readCount(dynamic data, List<String> keys) {
-    if (data is! Map) return null;
-
-    for (final key in keys) {
-      final value = data[key];
-
-      if (value != null) {
-        if (value is num) return value.toInt();
-
-        final parsed = int.tryParse(value.toString());
-        if (parsed != null) return parsed;
-      }
-    }
-
-    return null;
-  }
 
   @override
   void initState() {
     super.initState();
-    _fetchAttendanceSummary();
+
+    _loadLoggedInEmployee();
 
     _clockTimer = Timer.periodic(
       const Duration(seconds: 1),
-      (_) {
+          (_) {
         if (mounted) {
-          setState(() {
-            _now = DateTime.now();
-          });
+          setState(() => _now = DateTime.now());
         }
       },
     );
+  }
+
+  Future<void> _loadLoggedInEmployee() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedName = prefs.getString('emp_name');
+
+      if (!mounted) return;
+
+      setState(() {
+        _loggedInEmpName =
+        savedName != null && savedName.trim().isNotEmpty
+            ? savedName.trim()
+            : widget.empName.trim();
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _loggedInEmpName = widget.empName.trim();
+      });
+    }
   }
 
   @override
@@ -230,7 +104,7 @@ class _ProfilePageState extends State<ProfilePage> {
       'Thursday',
       'Friday',
       'Saturday',
-      'Sunday'
+      'Sunday',
     ];
 
     const months = [
@@ -245,7 +119,7 @@ class _ProfilePageState extends State<ProfilePage> {
       'September',
       'October',
       'November',
-      'December'
+      'December',
     ];
 
     return '${weekdays[_now.weekday - 1]}, '
@@ -257,91 +131,6 @@ class _ProfilePageState extends State<ProfilePage> {
     if (_now.hour < 17) return 'Good afternoon';
     return 'Good evening';
   }
-
-  // ==========================================
-  // GET LIVE GPS LOCATION
-  // ==========================================
-
-  Future<loc.LocationData> _getDevicePosition() async {
-    final loc.Location location = loc.Location();
-
-    bool serviceEnabled = await location.serviceEnabled();
-
-    if (!serviceEnabled) {
-      serviceEnabled = await location.requestService();
-
-      if (!serviceEnabled) {
-        throw Exception('Please enable GPS location.');
-      }
-    }
-
-    loc.PermissionStatus permission = await location.hasPermission();
-
-    if (permission == loc.PermissionStatus.denied) {
-      permission = await location.requestPermission();
-    }
-
-    if (permission != loc.PermissionStatus.granted) {
-      throw Exception('Location permission is required.');
-    }
-
-    await location.changeSettings(
-      accuracy: loc.LocationAccuracy.high,
-    );
-
-    final loc.LocationData position = await location.getLocation().timeout(
-          const Duration(seconds: 25),
-        );
-
-    if (position.latitude == null || position.longitude == null) {
-      throw Exception('Unable to fetch GPS coordinates.');
-    }
-
-    return position;
-  }
-
-  // ==========================================
-  // GET ADDRESS FROM GPS
-  // ==========================================
-
-  Future<String> _getAddress(
-    double latitude,
-    double longitude,
-  ) async {
-    final placemarks = await placemarkFromCoordinates(
-      latitude,
-      longitude,
-    );
-
-    if (placemarks.isEmpty) {
-      throw Exception('Unable to fetch location address.');
-    }
-
-    final place = placemarks.first;
-
-    final parts = [
-      place.street,
-      place.subLocality,
-      place.locality,
-      place.administrativeArea,
-    ];
-
-    final address = parts
-        .whereType<String>()
-        .where((s) => s.trim().isNotEmpty)
-        .toSet()
-        .join(', ');
-
-    if (address.isEmpty) {
-      throw Exception('Location address unavailable.');
-    }
-
-    return address;
-  }
-
-  // ==========================================
-  // PUNCH IN / PUNCH OUT API
-  // ==========================================
 
   Future<void> _onPunchPressed({
     required bool isPunchIn,
@@ -356,269 +145,30 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     });
 
-    try {
-      // STEP 1: Validate API URL
-      if (_punchApiUrl.trim().isEmpty || _punchApiUrl == 'YOUR_PUNCH_API_URL') {
-        throw Exception('Please configure Punch API URL.');
-      }
+    // Replace this delay with the actual attendance API request.
+    await Future<void>.delayed(
+      const Duration(milliseconds: 350),
+    );
 
-      // STEP 2: Read saved login details
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      debugPrint('========== SAVED KEYS ==========');
-      debugPrint('Keys: ${prefs.getKeys().toList()}');
-      debugPrint('Login status: ${prefs.getBool('isLoggedIn')}');
-      debugPrint('================================');
-      String readSavedValue(List<String> keys) {
-        for (final key in keys) {
-          final dynamic value = prefs.get(key);
-
-          if (value != null && value.toString().trim().isNotEmpty) {
-            return value.toString().trim();
-          }
-        }
-        return '';
-      }
-
-      final String username = readSavedValue([
-        'username',
-        'user_name',
-        'Username',
-      ]);
-
-      final String password = readSavedValue([
-        'password',
-        'Password',
-      ]);
-
-      final String empId = readSavedValue([
-        'emp_id',
-      ]);
-
-      // Debug safely without printing passwords
-      debugPrint('========== PUNCH DETAILS ==========');
-      debugPrint('Punch Type: ${isPunchIn ? 'logged in' : 'logged out'}');
-      debugPrint('Username available: ${username.isNotEmpty}');
-      debugPrint('Password available: ${password.isNotEmpty}');
-      debugPrint('Employee ID available: ${empId.isNotEmpty}');
-      debugPrint('===================================');
-
-      // STEP 3: Validate credentials
-      if (username.isEmpty) {
-        throw Exception(
-          'Username missing from saved login details.',
-        );
-      }
-
-      if (password.isEmpty) {
-        throw Exception(
-          'Password missing from saved login details.',
-        );
-      }
-
-      if (empId.isEmpty) {
-        throw Exception(
-          'Employee ID missing from saved login details.',
-        );
-      }
-
-      // STEP 4: Get current GPS location
-      final loc.LocationData position = await _getDevicePosition();
-
-      final double? latitude = position.latitude;
-      final double? longitude = position.longitude;
-
-      if (latitude == null || longitude == null) {
-        throw Exception('Unable to fetch current GPS location.');
-      }
-
-      // STEP 5: Convert GPS coordinates to address
-      final String address = await _getAddress(
-        latitude,
-        longitude,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _latitude = latitude;
-        _longitude = longitude;
-        _locationAddress = address;
-      });
-
-      // STEP 6: Set correct Punch Type
-      final String punchType = isPunchIn ? 'logged in' : 'logged out';
-
-      // STEP 7: Prepare API request body
-      final Map<String, String> requestBody = {
-        'Username': username,
-        'Password': password,
-        'person_id': empId,
-        'punch_type': punchType,
-        'location[lat]': latitude.toString(),
-        'location[long]': longitude.toString(),
-        'address': address,
-      };
-
-      debugPrint('Sending Punch Request: $punchType');
-
-      // STEP 8: Call Punch In / Punch Out API
-      final http.Response response = await http
-          .post(
-            Uri.parse(_punchApiUrl),
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: requestBody,
-          )
-          .timeout(
-            const Duration(seconds: 30),
-          );
-
-      debugPrint('Punch API Status: ${response.statusCode}');
-
-      // STEP 9: Check HTTP response
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(
-          'Attendance API error: ${response.statusCode}',
-        );
-      }
-
-      // STEP 10: Decode API response
-      final dynamic result = jsonDecode(response.body);
-
-      if (result is! Map) {
-        throw Exception('Invalid attendance API response.');
-      }
-
-      final String status = result['status']?.toString().toLowerCase() ?? '';
-
-      final dynamic success = result['success'];
-
-      final String message =
-          (result['message'] ?? result['msg'] ?? '').toString();
-
-      final String normalizedMessage = message.toLowerCase();
-
-      // STEP 11: Check API success/failure
-      if (status == 'error' ||
-          status == 'failed' ||
-          status == 'failure' ||
-          success == false ||
-          success == 0 ||
-          success == '0' ||
-          normalizedMessage.contains('failed') ||
-          normalizedMessage.contains('error')) {
-        throw Exception(
-          message.isNotEmpty ? message : 'Attendance was not recorded.',
-        );
-      }
-
-      if (!mounted) return;
-
-      // STEP 12: Update UI after successful API response
-      final String currentTime = TimeOfDay.now().format(context);
-
-      setState(() {
-        if (isPunchIn) {
-          _punchInTime = currentTime;
-          _hasPunchedIn = true;
-        } else {
-          _punchOutTime = currentTime;
-          _hasPunchedIn = false;
-        }
-      });
-
-      // STEP 13: Show success message
-      _showMessage(
-        message.isNotEmpty
-            ? message
-            : isPunchIn
-                ? 'Punch In recorded successfully'
-                : 'Punch Out recorded successfully',
-        success: true,
-      );
-    } on TimeoutException {
-      if (!mounted) return;
-
-      _showMessage(
-        'Request timed out. Please check your attendance status before retrying.',
-        success: false,
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      debugPrint('Punch error: ${e.runtimeType}');
-
-      _showMessage(
-        e.toString().replaceFirst('Exception: ', ''),
-        success: false,
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isPunchInLoading = false;
-          _isPunchOutLoading = false;
-        });
-      }
-    }
-  }
-
-  void _showMessage(
-    String message, {
-    required bool success,
-  }) {
     if (!mounted) return;
+
+    setState(() {
+      _isPunchInLoading = false;
+      _isPunchOutLoading = false;
+    });
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: success ? _green : Colors.redAccent,
-          content: Text(message),
+          content: Text(
+            '${isPunchIn ? 'Punch In' : 'Punch Out'} service '
+                'is not connected yet. No punch was recorded.',
+          ),
         ),
       );
   }
-
-  // ==========================================
-  // LOGOUT
-  // ==========================================
-
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    for (final key in [
-      'username',
-      'password',
-      'person_id',
-      'isLoggedIn',
-      'empName',
-      'emp_id',
-      'emp_name',
-      'user_name',
-      'email_office',
-      'designation',
-      'designation_id',
-      'new_dep_id',
-      'user_type',
-      'is_external',
-    ]) {
-      await prefs.remove(key);
-    }
-
-    if (!mounted) return;
-
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      '/login',
-      (route) => false,
-    );
-  }
-
-  // ==========================================
-  // MAIN SCREEN
-  // ==========================================
 
   @override
   Widget build(BuildContext context) {
@@ -626,14 +176,13 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: _background,
       drawer: AppDrawer(
         selectedPage: CrmPage.profile,
-        onProfileTap: () {},
-        onEmployeeTrackerTap: () {
-          Navigator.pushNamed(
-            context,
-            '/employee-tracker',
-          );
+        onProfileTap: () {
+          // Already on the Profile page.
         },
-        onLogoutTap: _logout,
+        onEmployeeTrackerTap: () {
+          Navigator.pushNamed(context, '/employee-tracker');
+        },
+        onLogoutTap: () {},
       ),
       body: Stack(
         children: [
@@ -657,6 +206,10 @@ class _ProfilePageState extends State<ProfilePage> {
             child: RefreshIndicator(
               color: _blue,
               onRefresh: () async {
+                await Future<void>.delayed(
+                  const Duration(milliseconds: 250),
+                );
+
                 if (mounted) {
                   setState(() => _now = DateTime.now());
                 }
@@ -665,15 +218,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
                 ),
-                //
-                //   if (mounted) {
-                //     setState(() => _now = DateTime.now());
-                //   }
-                // },  child: CustomScrollView(
-                //   physics: const AlwaysScrollableScrollPhysics(
-                //     parent: BouncingScrollPhysics(),
-                //   ),
-
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
@@ -684,7 +228,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        _buildTopBar(),
+                        const CrmAppBar(),
                         const SizedBox(height: 24),
                         _buildWelcome(),
                         const SizedBox(height: 20),
@@ -696,12 +240,12 @@ class _ProfilePageState extends State<ProfilePage> {
                         const SizedBox(height: 16),
                         _buildLocationCard(),
                         const SizedBox(height: 22),
-                        const Center(
+                        Center(
                           child: Text(
                             'CRM WORKSPACE  •  FIELD ATTENDANCE',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: _muted,
+                              color: _muted.withOpacity(0.85),
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 1.5,
@@ -720,78 +264,15 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ==========================================
-  // HEADER
-  // ==========================================
-
-  Widget _buildTopBar() {
-    return Row(
-      children: [
-        Builder(
-          builder: (drawerContext) => IconButton(
-            tooltip: 'Open menu',
-            onPressed: () => Scaffold.of(drawerContext).openDrawer(),
-            icon: const Icon(
-              Icons.menu_rounded,
-              color: _blue,
-              size: 28,
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [_deepBlue, _blue, _cyan],
-            ),
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: const Icon(
-            Icons.auto_awesome_rounded,
-            color: Colors.white,
-            size: 25,
-          ),
-        ),
-        const SizedBox(width: 12),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'CRM',
-                style: TextStyle(
-                  color: _ink,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Text(
-                'FIELD OPERATIONS',
-                style: TextStyle(
-                  color: _muted,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ==========================================
-  // WELCOME
-  // ==========================================
-
   Widget _buildWelcome() {
-    final name =
-        widget.empName.trim().isEmpty ? 'Employee' : widget.empName.trim();
+    final name = _loggedInEmpName.trim().isNotEmpty
+        ? _loggedInEmpName.trim()
+        : (widget.empName.trim().isNotEmpty
+        ? widget.empName.trim()
+        : 'Employee');
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Column(
@@ -813,6 +294,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 style: const TextStyle(
                   color: _ink,
                   fontSize: 27,
+                  height: 1.12,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.7,
                 ),
@@ -835,7 +317,16 @@ class _ProfilePageState extends State<ProfilePage> {
             shape: BoxShape.circle,
             gradient: const LinearGradient(
               colors: [_cyan, _blue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: _blue.withOpacity(0.22),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
             border: Border.all(
               color: Colors.white,
               width: 3,
@@ -843,7 +334,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           child: Center(
             child: Text(
-              name.isNotEmpty ? name[0].toUpperCase() : 'E',
+              name[0].toUpperCase(),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 26,
@@ -856,10 +347,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ==========================================
-  // LIVE CLOCK CARD
-  // ==========================================
-
   Widget _buildClockCard() {
     return Container(
       width: double.infinity,
@@ -871,6 +358,8 @@ class _ProfilePageState extends State<ProfilePage> {
             Color(0xFF126BE8),
             _cyan,
           ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
@@ -881,66 +370,112 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.calendar_month_rounded,
-                color: Colors.white70,
-                size: 17,
+          Positioned(
+            right: -20,
+            top: -35,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.08),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _formattedDate,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.16),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  '● LIVE',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            _formattedTime,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 37,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1.2,
             ),
           ),
-          const SizedBox(height: 8),
+          Positioned(
+            right: 24,
+            bottom: -54,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.12),
+                  width: 18,
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_month_rounded,
+                    color: Colors.white70,
+                    size: 17,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _formattedDate,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.16),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white24,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          color: Color(0xFF9BFFD6),
+                          size: 7,
+                        ),
+                        SizedBox(width: 5),
+                        Text(
+                          'LIVE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text(
+                _formattedTime,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 37,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1.2,
+                  height: 1.05,
+                  fontFeatures: [
+                    FontFeature.tabularFigures(),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ],
       ),
     );
   }
-
-  // ==========================================
-  // ATTENDANCE CARD
-  // ==========================================
 
   Widget _buildPunchCard() {
     return _GlassCard(
@@ -965,13 +500,19 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(width: 12),
               const Expanded(
-                child: Text(
-                  'Attendance',
-                  style: TextStyle(
-                    color: _ink,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Attendance',
+                      style: TextStyle(
+                        color: _ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                  ],
                 ),
               ),
               Container(
@@ -980,21 +521,16 @@ class _ProfilePageState extends State<ProfilePage> {
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: _hasPunchedIn
-                      ? const Color(0xFFE0F9EB)
-                      : const Color(0xFFFFF3DE),
+                  color: const Color(0xFFFFF3DE),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
-                  _hasPunchedIn
-                      ? 'PUNCHED IN'
-                      : _punchOutTime != null
-                          ? 'PUNCHED OUT'
-                          : 'NOT STARTED',
+                child: const Text(
+                  'NOT STARTED',
                   style: TextStyle(
-                    color: _hasPunchedIn ? _green : const Color(0xFF9B6500),
+                    color: Color(0xFF9B6500),
                     fontSize: 9,
                     fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
@@ -1007,7 +543,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: _timeDetail(
                   icon: Icons.login_rounded,
                   label: 'PUNCH IN',
-                  value: _punchInTime ?? '--:--',
+                  value: '--:--',
                 ),
               ),
               Container(
@@ -1019,7 +555,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: _timeDetail(
                   icon: Icons.logout_rounded,
                   label: 'PUNCH OUT',
-                  value: _punchOutTime ?? '--:--',
+                  value: '--:--',
                 ),
               ),
             ],
@@ -1056,16 +592,27 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          const Center(
-            child: Text(
-              'GPS location is captured during attendance.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
+          const SizedBox(height: 11),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
                 color: _muted,
-                fontSize: 10,
+                size: 14,
               ),
-            ),
+              SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'Attendance is not recorded until the API is connected.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _muted,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1079,13 +626,18 @@ class _ProfilePageState extends State<ProfilePage> {
     required bool isPunchIn,
     required List<Color> colors,
   }) {
-    final isAnyLoading = _isPunchInLoading || _isPunchOutLoading;
+    final isAnyRequestLoading =
+        _isPunchInLoading || _isPunchOutLoading;
 
     return SizedBox(
       height: 58,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: colors),
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
@@ -1096,49 +648,51 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
         child: ElevatedButton(
-          onPressed: isAnyLoading
+          onPressed: isAnyRequestLoading
               ? null
-              : () => _onPunchPressed(
-                    isPunchIn: isPunchIn,
-                  ),
+              : () => _onPunchPressed(isPunchIn: isPunchIn),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             disabledBackgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),
           ),
-          child: isLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2.5,
-                  ),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 21),
-                    const SizedBox(width: 7),
-                    Flexible(
-                      child: Text(
-                        label,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: isLoading
+                ? const SizedBox(
+              key: ValueKey('loading'),
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Colors.white,
+              ),
+            )
+                : Row(
+              key: ValueKey(label),
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 21),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
                     ),
-                  ],
+                  ),
                 ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1165,6 +719,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     color: _muted,
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -1184,42 +739,52 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ==========================================
-  // ATTENDANCE OVERVIEW
-  // ==========================================
-
   Widget _buildAttendanceSummary() {
-    final hasData = _presentCount != null && _absentCount != null;
+    final hasData =
+        _presentCount != null && _absentCount != null;
 
-    final present = _presentCount ?? 0;
-    final absent = _absentCount ?? 0;
-    final total = present + absent;
+    final total = hasData
+        ? _presentCount! + _absentCount!
+        : 0;
 
     return _GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Expanded(
-                child: Text(
-                  'Attendance overview',
-                  style: TextStyle(
-                    color: _ink,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                  ),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Attendance overview',
+                      style: TextStyle(
+                        color: _ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                  ],
                 ),
               ),
-              Icon(
-                Icons.donut_large_rounded,
-                color: _blue,
-                size: 25,
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE4F0FF),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(
+                  Icons.donut_large_rounded,
+                  color: _blue,
+                  size: 21,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           Row(
             children: [
               SizedBox(
@@ -1231,8 +796,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     CustomPaint(
                       size: const Size(124, 124),
                       painter: _AttendanceDonutPainter(
-                        present: present.toDouble(),
-                        absent: absent.toDouble(),
+                        present: hasData
+                            ? _presentCount!.toDouble()
+                            : 0,
+                        absent: hasData
+                            ? _absentCount!.toDouble()
+                            : 0,
                       ),
                     ),
                     Column(
@@ -1252,6 +821,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             color: _muted,
                             fontSize: 8,
                             fontWeight: FontWeight.w800,
+                            letterSpacing: 1,
                           ),
                         ),
                       ],
@@ -1266,20 +836,19 @@ class _ProfilePageState extends State<ProfilePage> {
                     _legendRow(
                       color: _green,
                       label: 'Present',
-                      count: hasData ? '$present' : '--',
+                      count: hasData ? '$_presentCount' : '--',
                     ),
                     const SizedBox(height: 15),
                     _legendRow(
                       color: _orange,
                       label: 'Absent',
-                      count: hasData ? '$absent' : '--',
+                      count: hasData ? '$_absentCount' : '--',
                     ),
                     const SizedBox(height: 13),
                     Text(
                       hasData
-                          ? 'Attendance summary'
-                          : 'Connect attendance summary API '
-                              'to display real counts.',
+                          ? 'Attendance summary from connected data.'
+                          : 'Connect the attendance summary API to display real counts.',
                       style: const TextStyle(
                         color: _muted,
                         fontSize: 10,
@@ -1318,6 +887,7 @@ class _ProfilePageState extends State<ProfilePage> {
             style: const TextStyle(
               color: _muted,
               fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -1333,13 +903,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ==========================================
-  // LOCATION CARD
-  // ==========================================
-
   Widget _buildLocationCard() {
-    final verified = _latitude != null && _longitude != null;
-
     return _GlassCard(
       padding: const EdgeInsets.all(17),
       child: Row(
@@ -1348,7 +912,12 @@ class _ProfilePageState extends State<ProfilePage> {
             width: 45,
             height: 45,
             decoration: BoxDecoration(
-              color: const Color(0xFFE4F0FF),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFFE1F7FF),
+                  Color(0xFFE4F0FF),
+                ],
+              ),
               borderRadius: BorderRadius.circular(15),
             ),
             child: const Icon(
@@ -1358,11 +927,11 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Location verification',
                   style: TextStyle(
                     color: _ink,
@@ -1370,12 +939,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
-                  _locationAddress,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  'GPS permission and site validation',
+                  style: TextStyle(
                     color: _muted,
                     fontSize: 11,
                   ),
@@ -1389,16 +956,16 @@ class _ProfilePageState extends State<ProfilePage> {
               vertical: 7,
             ),
             decoration: BoxDecoration(
-              color:
-                  verified ? const Color(0xFFE0F9EB) : const Color(0xFFFFF3DE),
+              color: const Color(0xFFFFF3DE),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(
-              verified ? 'VERIFIED' : 'PENDING',
+            child: const Text(
+              'PENDING',
               style: TextStyle(
-                color: verified ? _green : const Color(0xFF9B6500),
+                color: Color(0xFF9B6500),
                 fontSize: 9,
                 fontWeight: FontWeight.w900,
+                letterSpacing: 0.4,
               ),
             ),
           ),
@@ -1407,10 +974,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 }
-
-// ==========================================
-// GLASS CARD
-// ==========================================
 
 class _GlassCard extends StatelessWidget {
   final Widget child;
@@ -1423,31 +986,36 @@ class _GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(
-          color: Colors.white,
-          width: 1.4,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(25),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: 14,
+          sigmaY: 14,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF3976C8).withOpacity(0.07),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.76),
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.95),
+              width: 1.4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF3976C8).withOpacity(0.07),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ],
+          child: child,
+        ),
       ),
-      child: child,
     );
   }
 }
-
-// ==========================================
-// BACKGROUND GLOW
-// ==========================================
 
 class _GlowOrb extends StatelessWidget {
   final double size;
@@ -1480,10 +1048,6 @@ class _GlowOrb extends StatelessWidget {
   }
 }
 
-// ==========================================
-// ATTENDANCE DONUT PAINTER
-// ==========================================
-
 class _AttendanceDonutPainter extends CustomPainter {
   final double present;
   final double absent;
@@ -1509,12 +1073,13 @@ class _AttendanceDonutPainter extends CustomPainter {
     canvas.drawArc(
       chartRect,
       0,
-      math.pi * 2,
+      3.141592653589793 * 2,
       false,
       backgroundPaint,
     );
 
     final total = present + absent;
+
     if (total <= 0) return;
 
     final presentPaint = Paint()
@@ -1529,9 +1094,10 @@ class _AttendanceDonutPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    const startAngle = -math.pi / 2;
+    const startAngle = -1.5707963267948966;
 
-    final presentSweep = (present / total) * math.pi * 2;
+    final presentSweep =
+        (present / total) * 6.283185307179586;
 
     final gap = total > 1 ? 0.055 : 0.0;
 
@@ -1539,7 +1105,7 @@ class _AttendanceDonutPainter extends CustomPainter {
       canvas.drawArc(
         chartRect,
         startAngle,
-        math.max(0, presentSweep - gap),
+        (presentSweep - gap).clamp(0.0, 6.283185307179586),
         false,
         presentPaint,
       );
@@ -1549,10 +1115,8 @@ class _AttendanceDonutPainter extends CustomPainter {
       canvas.drawArc(
         chartRect,
         startAngle + presentSweep + gap,
-        math.max(
-          0,
-          (absent / total) * math.pi * 2 - gap,
-        ),
+        ((absent / total) * 6.283185307179586 - gap)
+            .clamp(0.0, 6.283185307179586),
         false,
         absentPaint,
       );
@@ -1561,8 +1125,9 @@ class _AttendanceDonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(
-    covariant _AttendanceDonutPainter oldDelegate,
-  ) {
-    return oldDelegate.present != present || oldDelegate.absent != absent;
+      covariant _AttendanceDonutPainter oldDelegate,
+      ) {
+    return oldDelegate.present != present ||
+        oldDelegate.absent != absent;
   }
 }
