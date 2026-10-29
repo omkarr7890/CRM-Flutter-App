@@ -69,6 +69,7 @@ class _LoginPageState extends State<LoginPage>
     super.dispose();
   }
 
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -79,189 +80,118 @@ class _LoginPageState extends State<LoginPage>
     });
 
     try {
-      // Replace this with your actual login API URL.
-
       const String apiUrl =
           'https://salasarcrm.aonesalasar.com/api/mobile/login';
 
-      final requestBody = {
-        'Username': _usernameController.text.trim(),
-        'Password': _passwordController.text,
-      };
-
-      debugPrint('Sending login request...');
+      final String username = _usernameController.text.trim();
+      final String password = _passwordController.text;
 
       final response = await http.post(
         Uri.parse(apiUrl),
-        headers: {
-          'Accept': 'application/json',
+        headers: {'Accept': 'application/json'},
+        body: {
+          'Username': username,
+          'Password': password,
         },
-        body: requestBody,
       );
 
       debugPrint('Login status: ${response.statusCode}');
       debugPrint('Login response: ${response.body}');
 
-      if (!mounted) return;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('Server error: ${response.statusCode}');
+      }
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final dynamic decoded = jsonDecode(response.body);
+      final dynamic decoded = jsonDecode(response.body);
 
-        if (decoded is! Map<String, dynamic>) {
-          throw const FormatException('Invalid response from server.');
-        }
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('Invalid response from server.');
+      }
 
-        final bool success = decoded['status'] == 'success';
+      // Check login status once.
+      if (decoded['status'] != 'success') {
+        final message =
+        (decoded['message'] ?? decoded['msg'] ?? 'Login failed.')
+            .toString();
 
-<<<<<<< Updated upstream
-        if (success) {
-          final Map<String, dynamic> data =
-          Map<String, dynamic>.from(decoded['data']);
+        if (!mounted) return;
 
-          debugPrint('Login response fields: ${data.keys.toList()}');
-
-          final String empName =
-          (data['emp_name'] ?? '').toString();
-
-          final String empId =
-          (data['emp_id'] ?? '').toString().trim();
-
-          final String username = _usernameController.text.trim();
-          final String password = _passwordController.text;
-
-          if (empId.isEmpty) {
-            throw Exception(
-              'Employee ID missing from login response. '
-                  'Available fields: ${data.keys.join(', ')}',
-            );
-          }
-
-          final prefs = await SharedPreferences.getInstance();
-
-          // Save the employee information
-=======
-
-        if (success) {
-          final dynamic rawData = decoded['data'];
-
-          if (rawData is! Map<String, dynamic>) {
-            throw const FormatException('Invalid employee data.');
-          }
-
-          final String empName = (rawData['emp_name'] ?? '').toString().trim();
-
-          if (empName.isEmpty) {
-            throw const FormatException(
-              'Employee name is missing from the login response.',
-            );
-          }
-
-
-          final prefs = await SharedPreferences.getInstance();
-
-// Save login session
-          await prefs.setBool('isLoggedIn', true);
->>>>>>> Stashed changes
-          await prefs.setString('empName', empName);
-          await prefs.setString('emp_id', empId);
-          await prefs.setString('username', username);
-
-          // Existing Punch API requires Password.
-          // For production, store credentials securely instead.
-          await prefs.setString('password', password);
-
-          // Mark login successful only after the required data is saved.
-          await prefs.setBool('isLoggedIn', true);
-
-          debugPrint('========== LOGIN STORAGE ==========');
-          debugPrint('Username saved: ${prefs.containsKey('username')}');
-          debugPrint('Password saved: ${prefs.containsKey('password')}');
-          debugPrint('Employee ID saved: ${prefs.containsKey('emp_id')}');
-          debugPrint('===================================');
-
-          if (!mounted) return;
-
-<<<<<<< Updated upstream
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProfilePage(empName: empName),
-            ),
-          );
-        }else {
-=======
-// Save the logged-in employee's details dynamically
-          await prefs.setInt(
-            'emp_id',
-            int.parse(rawData['emp_id'].toString()),
-          );
-
-          await prefs.setString(
-            'user_name',
-            rawData['user_name'].toString(),
-          );
-
-          await prefs.setString(
-            'emp_name',
-            empName,
-          );
-
-// Save the password for the current attendance API request.
-// Production apps should use secure authentication instead.
-          await prefs.setString(
-            'user_pass',
-            _passwordController.text,
-          );
-
-          debugPrint('LOGIN PREFS SAVED:');
-          debugPrint('emp_id: ${prefs.getInt('emp_id')}');
-          debugPrint('user_name: ${prefs.getString('user_name')}');
-          debugPrint(
-            'user_pass exists: '
-                '${(prefs.getString('user_pass') ?? '').isNotEmpty}',
-          );
-
-
-
-          if (!mounted) return;
-
-          // Navigate to Profile only once
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProfilePage(empName: empName),
-            ),
-                (route) => false,
-          );
-        } else {
->>>>>>> Stashed changes
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                (decoded['message'] ?? 'Login failed.').toString(),
-              ),
-            ),
-          );
-        }
-
-      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Server error: ${response.statusCode}',
-            ),
-          ),
+          SnackBar(content: Text(message)),
+        );
+        return;
+      }
+
+      // Read employee details.
+      final dynamic rawData = decoded['data'];
+
+      if (rawData is! Map) {
+        throw const FormatException('Employee data is missing.');
+      }
+
+      final Map<String, dynamic> data =
+      Map<String, dynamic>.from(rawData);
+
+      final String empName =
+      (data['emp_name'] ?? data['user_name'] ?? '')
+          .toString()
+          .trim();
+
+      final String empId =
+      (data['emp_id'] ?? data['person_id'] ?? '')
+          .toString()
+          .trim();
+
+      if (empId.isEmpty) {
+        throw const FormatException(
+          'Employee ID is missing from the login response.',
         );
       }
+
+      final prefs = await SharedPreferences.getInstance();
+
+      // Save login session and employee details.
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('empName', empName);
+      await prefs.setString('emp_name', empName);
+      await prefs.setString('emp_id', empId);
+      await prefs.setString('person_id', empId);
+      await prefs.setString('username', username);
+      await prefs.setString('user_name', username);
+
+      // Existing attendance API credentials.
+      await prefs.setString('password', password);
+      await prefs.setString('user_pass', password);
+
+      // Keep the numeric ID separate to avoid SharedPreferences type conflicts.
+      final int? numericEmpId = int.tryParse(empId);
+      if (numericEmpId != null) {
+        await prefs.setInt('emp_id_numeric', numericEmpId);
+      }
+
+      debugPrint('Login details saved successfully.');
+      debugPrint('Employee ID: $empId');
+      debugPrint('Employee name: $empName');
+
+      if (!mounted) return;
+
+      // Navigate to Profile only once.
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProfilePage(empName: empName),
+        ),
+            (route) => false,
+      );
     } on SocketException catch (e) {
-      debugPrint('Network/DNS error: $e');
+      debugPrint('Network error: $e');
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Cannot connect to the server. Check your internet or API URL.',
+            'Cannot connect to the server. Check your internet connection.',
           ),
         ),
       );
@@ -281,9 +211,7 @@ class _LoginPageState extends State<LoginPage>
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid response received from the server.'),
-        ),
+        SnackBar(content: Text(e.message)),
       );
     } catch (e) {
       debugPrint('Login error: $e');
@@ -291,7 +219,11 @@ class _LoginPageState extends State<LoginPage>
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: $e')),
+        SnackBar(
+          content: Text(
+            'Login failed: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
       );
     } finally {
       if (mounted) {

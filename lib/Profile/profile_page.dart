@@ -1,26 +1,13 @@
-
 import 'dart:async';
 import 'dart:convert';
-<<<<<<< Updated upstream
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-// import 'package:geolocator/geolocator.dart';
-
 import 'package:location/location.dart' as loc;
 import 'package:geocoding/geocoding.dart';
-
 import 'package:field_visit_app/AppDrawer/app_drawer.dart';
 
-=======
-import 'dart:ui';
-
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:field_visit_app/AppDrawer/app_drawer.dart';
->>>>>>> Stashed changes
 class ProfilePage extends StatefulWidget {
   final String empName;
 
@@ -44,7 +31,8 @@ class _ProfilePageState extends State<ProfilePage> {
   static const Color _orange = Color(0xFFFFA34D);
 
   // Replace with the actual Punch In/Out API endpoint.
-  static const String _punchApiUrl = 'https://salasarcrm.aonesalasar.com/api/mobile/set-user-attend';
+  static const String _punchApiUrl =
+      'https://salasarcrm.aonesalasar.com/api/mobile/set-user-attend';
 
   Timer? _clockTimer;
   DateTime _now = DateTime.now();
@@ -69,20 +57,29 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      final personId = prefs.getInt('emp_id');
-      final username = prefs.getString('user_name');
-      final password = prefs.getString('user_pass');
+      final int? personId =
+          prefs.getInt('emp_id_numeric') ??
+              int.tryParse(prefs.getString('emp_id') ?? '');
 
-      debugPrint('Attendance emp_id: $personId');
-      debugPrint('Attendance user_name: $username');
-      debugPrint(
-        'Attendance password exists: ${password != null && password.isNotEmpty}',
-      );
+      final String? username =
+          prefs.getString('user_name') ?? prefs.getString('username');
 
-      if (personId == null || username == null || password == null) {
-        debugPrint('ERROR: Login details are missing in SharedPreferences.');
+      final String? password =
+          prefs.getString('user_pass') ?? prefs.getString('password');
+
+      debugPrint('Attendance employee ID: $personId');
+      debugPrint('Attendance username available: ${username?.isNotEmpty == true}');
+      debugPrint('Attendance password available: ${password?.isNotEmpty == true}');
+
+      if (personId == null ||
+          username == null ||
+          username.isEmpty ||
+          password == null ||
+          password.isEmpty) {
+        debugPrint('ERROR: Required login details are missing.');
         return;
       }
+
 
       final response = await http.post(
         Uri.parse(
@@ -97,9 +94,8 @@ class _ProfilePageState extends State<ProfilePage> {
           'Password': password,
         },
       );
-
-      debugPrint('Attendance status: ${response.statusCode}');
-      debugPrint('Attendance response: ${response.body}');
+      debugPrint('Punch API Status: ${response.statusCode}');
+      debugPrint('Punch API Response: ${response.body}');
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         debugPrint('ERROR: Attendance API request failed.');
@@ -113,8 +109,7 @@ class _ProfilePageState extends State<ProfilePage> {
         return;
       }
 
-      final Map<String, dynamic> root =
-      Map<String, dynamic>.from(decoded);
+      final Map<String, dynamic> root = Map<String, dynamic>.from(decoded);
 
       // Inspect the actual response structure.
       debugPrint('Root keys: ${root.keys.toList()}');
@@ -134,17 +129,15 @@ class _ProfilePageState extends State<ProfilePage> {
         return;
       }
 
-      final Map<String, dynamic> employeeData =
-      Map<String, dynamic>.from(data);
+      final Map<String, dynamic> employeeData = Map<String, dynamic>.from(data);
 
       debugPrint('Employee data keys: ${employeeData.keys.toList()}');
 
       // Try common locations for the attendance summary.
-      dynamic summary =
-          employeeData['attendance_summary'] ??
-              employeeData['attendanceSummary'] ??
-              root['attendance_summary'] ??
-              root['attendanceSummary'];
+      dynamic summary = employeeData['attendance_summary'] ??
+          employeeData['attendanceSummary'] ??
+          root['attendance_summary'] ??
+          root['attendanceSummary'];
 
       // Some APIs return counts directly inside data.
       summary ??= employeeData;
@@ -196,6 +189,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return null;
   }
+
   @override
   void initState() {
     super.initState();
@@ -203,7 +197,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     _clockTimer = Timer.periodic(
       const Duration(seconds: 1),
-          (_) {
+      (_) {
         if (mounted) {
           setState(() {
             _now = DateTime.now();
@@ -230,14 +224,28 @@ class _ProfilePageState extends State<ProfilePage> {
 
   String get _formattedDate {
     const weekdays = [
-      'Monday', 'Tuesday', 'Wednesday',
-      'Thursday', 'Friday', 'Saturday', 'Sunday'
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
     ];
 
     const months = [
-      'January', 'February', 'March', 'April',
-      'May', 'June', 'July', 'August',
-      'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
 
     return '${weekdays[_now.weekday - 1]}, '
@@ -254,8 +262,6 @@ class _ProfilePageState extends State<ProfilePage> {
   // GET LIVE GPS LOCATION
   // ==========================================
 
-
-
   Future<loc.LocationData> _getDevicePosition() async {
     final loc.Location location = loc.Location();
 
@@ -269,8 +275,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     }
 
-    loc.PermissionStatus permission =
-    await location.hasPermission();
+    loc.PermissionStatus permission = await location.hasPermission();
 
     if (permission == loc.PermissionStatus.denied) {
       permission = await location.requestPermission();
@@ -284,29 +289,25 @@ class _ProfilePageState extends State<ProfilePage> {
       accuracy: loc.LocationAccuracy.high,
     );
 
-    final loc.LocationData position =
-    await location.getLocation().timeout(
-      const Duration(seconds: 25),
-    );
+    final loc.LocationData position = await location.getLocation().timeout(
+          const Duration(seconds: 25),
+        );
 
-    if (position.latitude == null ||
-        position.longitude == null) {
+    if (position.latitude == null || position.longitude == null) {
       throw Exception('Unable to fetch GPS coordinates.');
     }
 
     return position;
   }
 
-
-
   // ==========================================
   // GET ADDRESS FROM GPS
   // ==========================================
 
   Future<String> _getAddress(
-      double latitude,
-      double longitude,
-      ) async {
+    double latitude,
+    double longitude,
+  ) async {
     final placemarks = await placemarkFromCoordinates(
       latitude,
       longitude,
@@ -357,14 +358,12 @@ class _ProfilePageState extends State<ProfilePage> {
 
     try {
       // STEP 1: Validate API URL
-      if (_punchApiUrl.trim().isEmpty ||
-          _punchApiUrl == 'YOUR_PUNCH_API_URL') {
+      if (_punchApiUrl.trim().isEmpty || _punchApiUrl == 'YOUR_PUNCH_API_URL') {
         throw Exception('Please configure Punch API URL.');
       }
 
       // STEP 2: Read saved login details
-      final SharedPreferences prefs =
-      await SharedPreferences.getInstance();
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
       debugPrint('========== SAVED KEYS ==========');
       debugPrint('Keys: ${prefs.getKeys().toList()}');
       debugPrint('Login status: ${prefs.getBool('isLoggedIn')}');
@@ -373,8 +372,7 @@ class _ProfilePageState extends State<ProfilePage> {
         for (final key in keys) {
           final dynamic value = prefs.get(key);
 
-          if (value != null &&
-              value.toString().trim().isNotEmpty) {
+          if (value != null && value.toString().trim().isNotEmpty) {
             return value.toString().trim();
           }
         }
@@ -424,8 +422,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
 
       // STEP 4: Get current GPS location
-      final loc.LocationData position =
-      await _getDevicePosition();
+      final loc.LocationData position = await _getDevicePosition();
 
       final double? latitude = position.latitude;
       final double? longitude = position.longitude;
@@ -449,8 +446,7 @@ class _ProfilePageState extends State<ProfilePage> {
       });
 
       // STEP 6: Set correct Punch Type
-      final String punchType =
-      isPunchIn ? 'logged in' : 'logged out';
+      final String punchType = isPunchIn ? 'logged in' : 'logged out';
 
       // STEP 7: Prepare API request body
       final Map<String, String> requestBody = {
@@ -466,22 +462,23 @@ class _ProfilePageState extends State<ProfilePage> {
       debugPrint('Sending Punch Request: $punchType');
 
       // STEP 8: Call Punch In / Punch Out API
-      final http.Response response = await http.post(
-        Uri.parse(_punchApiUrl),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: requestBody,
-      ).timeout(
-        const Duration(seconds: 30),
-      );
+      final http.Response response = await http
+          .post(
+            Uri.parse(_punchApiUrl),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: requestBody,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+          );
 
       debugPrint('Punch API Status: ${response.statusCode}');
 
       // STEP 9: Check HTTP response
-      if (response.statusCode < 200 ||
-          response.statusCode >= 300) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(
           'Attendance API error: ${response.statusCode}',
         );
@@ -494,13 +491,12 @@ class _ProfilePageState extends State<ProfilePage> {
         throw Exception('Invalid attendance API response.');
       }
 
-      final String status =
-          result['status']?.toString().toLowerCase() ?? '';
+      final String status = result['status']?.toString().toLowerCase() ?? '';
 
       final dynamic success = result['success'];
 
       final String message =
-      (result['message'] ?? result['msg'] ?? '').toString();
+          (result['message'] ?? result['msg'] ?? '').toString();
 
       final String normalizedMessage = message.toLowerCase();
 
@@ -514,17 +510,14 @@ class _ProfilePageState extends State<ProfilePage> {
           normalizedMessage.contains('failed') ||
           normalizedMessage.contains('error')) {
         throw Exception(
-          message.isNotEmpty
-              ? message
-              : 'Attendance was not recorded.',
+          message.isNotEmpty ? message : 'Attendance was not recorded.',
         );
       }
 
       if (!mounted) return;
 
       // STEP 12: Update UI after successful API response
-      final String currentTime =
-      TimeOfDay.now().format(context);
+      final String currentTime = TimeOfDay.now().format(context);
 
       setState(() {
         if (isPunchIn) {
@@ -541,8 +534,8 @@ class _ProfilePageState extends State<ProfilePage> {
         message.isNotEmpty
             ? message
             : isPunchIn
-            ? 'Punch In recorded successfully'
-            : 'Punch Out recorded successfully',
+                ? 'Punch In recorded successfully'
+                : 'Punch Out recorded successfully',
         success: true,
       );
     } on TimeoutException {
@@ -572,9 +565,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showMessage(
-      String message, {
-        required bool success,
-      }) {
+    String message, {
+    required bool success,
+  }) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context)
@@ -582,8 +575,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor:
-          success ? _green : Colors.redAccent,
+          backgroundColor: success ? _green : Colors.redAccent,
           content: Text(message),
         ),
       );
@@ -620,7 +612,7 @@ class _ProfilePageState extends State<ProfilePage> {
     Navigator.pushNamedAndRemoveUntil(
       context,
       '/login',
-          (route) => false,
+      (route) => false,
     );
   }
 
@@ -665,28 +657,30 @@ class _ProfilePageState extends State<ProfilePage> {
             child: RefreshIndicator(
               color: _blue,
               onRefresh: () async {
-<<<<<<< Updated upstream
                 if (mounted) {
                   setState(() => _now = DateTime.now());
                 }
               },
               child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-=======
-                await _fetchAttendanceSummary();
-
-                if (mounted) {
-                  setState(() => _now = DateTime.now());
-                }
-              },              child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
                 ),
->>>>>>> Stashed changes
+                //
+                //   if (mounted) {
+                //     setState(() => _now = DateTime.now());
+                //   }
+                // },  child: CustomScrollView(
+                //   physics: const AlwaysScrollableScrollPhysics(
+                //     parent: BouncingScrollPhysics(),
+                //   ),
+
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
-                      20, 14, 20, 28,
+                      20,
+                      14,
+                      20,
+                      28,
                     ),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
@@ -736,8 +730,7 @@ class _ProfilePageState extends State<ProfilePage> {
         Builder(
           builder: (drawerContext) => IconButton(
             tooltip: 'Open menu',
-            onPressed: () =>
-                Scaffold.of(drawerContext).openDrawer(),
+            onPressed: () => Scaffold.of(drawerContext).openDrawer(),
             icon: const Icon(
               Icons.menu_rounded,
               color: _blue,
@@ -795,9 +788,8 @@ class _ProfilePageState extends State<ProfilePage> {
   // ==========================================
 
   Widget _buildWelcome() {
-    final name = widget.empName.trim().isEmpty
-        ? 'Employee'
-        : widget.empName.trim();
+    final name =
+        widget.empName.trim().isEmpty ? 'Employee' : widget.empName.trim();
 
     return Row(
       children: [
@@ -851,9 +843,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           child: Center(
             child: Text(
-              name.isNotEmpty
-                  ? name[0].toUpperCase()
-                  : 'E',
+              name.isNotEmpty ? name[0].toUpperCase() : 'E',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 26,
@@ -999,12 +989,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   _hasPunchedIn
                       ? 'PUNCHED IN'
                       : _punchOutTime != null
-                      ? 'PUNCHED OUT'
-                      : 'NOT STARTED',
+                          ? 'PUNCHED OUT'
+                          : 'NOT STARTED',
                   style: TextStyle(
-                    color: _hasPunchedIn
-                        ? _green
-                        : const Color(0xFF9B6500),
+                    color: _hasPunchedIn ? _green : const Color(0xFF9B6500),
                     fontSize: 9,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1091,8 +1079,7 @@ class _ProfilePageState extends State<ProfilePage> {
     required bool isPunchIn,
     required List<Color> colors,
   }) {
-    final isAnyLoading =
-        _isPunchInLoading || _isPunchOutLoading;
+    final isAnyLoading = _isPunchInLoading || _isPunchOutLoading;
 
     return SizedBox(
       height: 58,
@@ -1112,8 +1099,8 @@ class _ProfilePageState extends State<ProfilePage> {
           onPressed: isAnyLoading
               ? null
               : () => _onPunchPressed(
-            isPunchIn: isPunchIn,
-          ),
+                    isPunchIn: isPunchIn,
+                  ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             disabledBackgroundColor: Colors.transparent,
@@ -1128,30 +1115,30 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           child: isLoading
               ? const SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 2.5,
-            ),
-          )
-              : Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 21),
-              const SizedBox(width: 7),
-              Flexible(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
                   ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 21),
+                    const SizedBox(width: 7),
+                    Flexible(
+                      child: Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -1202,8 +1189,7 @@ class _ProfilePageState extends State<ProfilePage> {
   // ==========================================
 
   Widget _buildAttendanceSummary() {
-    final hasData =
-        _presentCount != null && _absentCount != null;
+    final hasData = _presentCount != null && _absentCount != null;
 
     final present = _presentCount ?? 0;
     final absent = _absentCount ?? 0;
@@ -1280,24 +1266,20 @@ class _ProfilePageState extends State<ProfilePage> {
                     _legendRow(
                       color: _green,
                       label: 'Present',
-                      count: hasData
-                          ? '$present'
-                          : '--',
+                      count: hasData ? '$present' : '--',
                     ),
                     const SizedBox(height: 15),
                     _legendRow(
                       color: _orange,
                       label: 'Absent',
-                      count: hasData
-                          ? '$absent'
-                          : '--',
+                      count: hasData ? '$absent' : '--',
                     ),
                     const SizedBox(height: 13),
                     Text(
                       hasData
                           ? 'Attendance summary'
                           : 'Connect attendance summary API '
-                          'to display real counts.',
+                              'to display real counts.',
                       style: const TextStyle(
                         color: _muted,
                         fontSize: 10,
@@ -1356,8 +1338,7 @@ class _ProfilePageState extends State<ProfilePage> {
   // ==========================================
 
   Widget _buildLocationCard() {
-    final verified =
-        _latitude != null && _longitude != null;
+    final verified = _latitude != null && _longitude != null;
 
     return _GlassCard(
       padding: const EdgeInsets.all(17),
@@ -1408,17 +1389,14 @@ class _ProfilePageState extends State<ProfilePage> {
               vertical: 7,
             ),
             decoration: BoxDecoration(
-              color: verified
-                  ? const Color(0xFFE0F9EB)
-                  : const Color(0xFFFFF3DE),
+              color:
+                  verified ? const Color(0xFFE0F9EB) : const Color(0xFFFFF3DE),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               verified ? 'VERIFIED' : 'PENDING',
               style: TextStyle(
-                color: verified
-                    ? _green
-                    : const Color(0xFF9B6500),
+                color: verified ? _green : const Color(0xFF9B6500),
                 fontSize: 9,
                 fontWeight: FontWeight.w900,
               ),
@@ -1456,8 +1434,7 @@ class _GlassCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF3976C8)
-                .withOpacity(0.07),
+            color: const Color(0xFF3976C8).withOpacity(0.07),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -1554,8 +1531,7 @@ class _AttendanceDonutPainter extends CustomPainter {
 
     const startAngle = -math.pi / 2;
 
-    final presentSweep =
-        (present / total) * math.pi * 2;
+    final presentSweep = (present / total) * math.pi * 2;
 
     final gap = total > 1 ? 0.055 : 0.0;
 
@@ -1585,9 +1561,8 @@ class _AttendanceDonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(
-      covariant _AttendanceDonutPainter oldDelegate,
-      ) {
-    return oldDelegate.present != present ||
-        oldDelegate.absent != absent;
+    covariant _AttendanceDonutPainter oldDelegate,
+  ) {
+    return oldDelegate.present != present || oldDelegate.absent != absent;
   }
 }
