@@ -23,6 +23,9 @@ class _EmployeeTrackerPageState extends State<EmployeeTrackerPage>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  // late AnimationController _animationController;
+  // late Animation<double> _fadeAnimation;
+
   bool _showSearchResults = false;
   String _searchQuery = '';
   Map<String, dynamic>? _selectedEmployee;
@@ -663,7 +666,7 @@ class _EmployeeTrackerPageState extends State<EmployeeTrackerPage>
         color: Colors.white,
         borderRadius: BorderRadius.circular(25),
         border: Border.all(color: const Color(0xFFE1ECFC)),
-        boxShadow: [q
+        boxShadow: [
           BoxShadow(
             color: blue.withOpacity(0.07),
             blurRadius: 22,
@@ -915,8 +918,8 @@ class _EmployeeTrackerPageState extends State<EmployeeTrackerPage>
   }
 
   Widget _buildSelectedEmployeeCard(
-    Map<String, dynamic> employee,
-  ) {
+      Map<String, dynamic> employee,
+      ) {
     final name = employee['emp_name'].toString();
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
@@ -1044,10 +1047,10 @@ class _EmployeeTrackerPageState extends State<EmployeeTrackerPage>
   }
 
   Widget _detailRow(
-    IconData icon,
-    String label,
-    String value,
-  ) {
+      IconData icon,
+      String label,
+      String value,
+      ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
